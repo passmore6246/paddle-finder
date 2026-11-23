@@ -187,6 +187,11 @@ body{padding:8px 6px 24px;-webkit-text-size-adjust:100%}
 .pf-axes label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--pf-muted)}
 .pf-presets{display:flex;flex-wrap:wrap;gap:6px;margin:4px 4px 8px}
 .pf-chipbtn{border:1px solid var(--pf-line);background:transparent;color:var(--pf-fg);border-radius:999px;padding:5px 10px;font-size:12px;cursor:pointer}
+.pf-pricewrap{gap:2px!important}
+.pf-pricewrap > span:first-child{font-size:12px;color:var(--pf-muted)}
+.pf-readout{color:var(--pf-lime);font-weight:500;font-size:13px}
+.pf-range{width:100%;height:28px;margin:0;accent-color:#C6F432;cursor:pointer}
+.pf-rangeends{display:flex;justify-content:space-between;font-size:10px;color:var(--pf-muted)}
 @media (min-width:640px){.pf-controls{grid-template-columns:repeat(3,minmax(0,1fr))}.pf-table td.pf-num{width:48px}}
 </style>
 
@@ -200,6 +205,10 @@ body{padding:8px 6px 24px;-webkit-text-size-adjust:100%}
     <label class="pf-wide">Search
       <input class="pf-search" type="search" placeholder="Selkirk Vanguard" aria-label="Search paddles" data-param="q">
     </label>
+    <label class="pf-wide pf-pricewrap"><span>Max price: <b class="pf-readout" data-draw="pricecap">—</b></span>
+      <input class="pf-range" type="range" min="70" max="350" step="10" value="350" data-param="maxPrice" aria-label="Max price">
+      <span class="pf-rangeends"><span>$70</span><span>Any</span></span>
+    </label>
     <label>Shape
       <select class="dash-select" data-param="shape" aria-label="Shape">
         <option value="Elongated">Elongated</option>
@@ -207,15 +216,6 @@ body{padding:8px 6px 24px;-webkit-text-size-adjust:100%}
         <option value="Extra-elongated">Extra-elongated</option>
         <option value="Hybrid">Hybrid</option>
         <option value="Widebody">Widebody</option>
-      </select>
-    </label>
-    <label>Max price
-      <select class="dash-select" data-param="maxPrice" aria-label="Max price">
-        <option value="0">Any price</option>
-        <option value="150">Under $150</option>
-        <option value="200">Under $200</option>
-        <option value="250">Under $250</option>
-        <option value="300">Under $300</option>
       </select>
     </label>
     <label>Grit durability
@@ -352,7 +352,7 @@ dash.calc('matches', {
     const rows = scored.filter((p) =>
       p.certified === 'Yes' &&
       (!f.shape || p.shape === f.shape) &&
-      (!maxPrice || (p.price != null && p.price < maxPrice)) &&
+      (!maxPrice || (p.price != null && p.price <= maxPrice)) &&
       (!grit || (p.durability != null && p.durability <= grit)) &&
       (f.untested || p.tested === 'Yes') &&
       (!q || (p.brand + ' ' + p.name).toLowerCase().includes(q)));
@@ -390,6 +390,17 @@ window.pfState = {limit: 60, compare: [], open: []};
     if (el.type === 'checkbox') {
       el.checked = !!params[name];
       el.addEventListener('change', () => dash.setParams({[name]: el.checked}));
+    } else if (el.type === 'range') {
+      const top = Number(el.max);
+      const cap = Number(params[name]) || 0;
+      el.value = String(cap && cap < top ? cap : top);
+      el.setAttribute('aria-valuetext', cap && cap < top ? 'Up to $' + cap : 'Any price');
+      el.addEventListener('input', () => {
+        const v = Number(el.value);
+        el.setAttribute('aria-valuetext', v < top ? 'Up to $' + v : 'Any price');
+        window.pfState.limit = 60;
+        dash.setParams({[name]: v < top ? v : 0});
+      });
     } else {
       el.value = params[name] == null ? '' : String(params[name]);
       const ev = el.tagName === 'SELECT' ? 'change' : 'input';
@@ -451,6 +462,10 @@ function pfSummary(el, field) {
 }
 dash.draw('count', (el) => pfSummary(el, 'count'));
 dash.draw('top', (el) => pfSummary(el, 'top'));
+dash.draw('pricecap', (el) => {
+  const cap = Number(dash.params().maxPrice) || 0;
+  el.textContent = cap ? 'up to $' + cap : 'any';
+});
 
 function pfShowCompare() {
   const n = window.pfState.compare.length;
